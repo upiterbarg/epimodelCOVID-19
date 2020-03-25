@@ -11,7 +11,7 @@ from data import *
 import theano
 
 floatX = theano.config.floatX
-
+seed(0)
 #plt.style.use('seaborn-darkgrid')
 #rc('font',**{'family':'serif','serif':['Palatino']})
 #rc('text', usetex=True)
@@ -109,16 +109,23 @@ def plot(posterior_predictive, dates, y_train):
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    plt.plot(dates, y0_mean, 'g', label='predicted susceptible')
-    plt.plot(dates, y1_mean, 'b', label='predicted infected')
-
-    plt.plot(dates, y_train[:][0], ':g', label='true susceptible')
-    plt.plot(dates, y_train[:][1], ':b', label='predicted infected')
+    plt.plot(dates, y0_mean, ':g', label='predicted susceptible')
+    plt.plot(dates, y_train[:, 0], 'g', label='true susceptible')
 
     ax.set_xlabel('num days since first case')
     ax.set_ylabel('fraction of population')
     ax.legend()
-    fig.savefig('inference', dpi=1000, bbox_inches='tight')
+    fig.savefig('inference_sus', dpi=1000, bbox_inches='tight')
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    plt.plot(dates, y1_mean, ':b', label='predicted infected')
+    plt.plot(dates, y_train[:, 1], 'b', label='true infected')
+
+    ax.set_xlabel('num days since first case')
+    ax.set_ylabel('fraction of population')
+    ax.legend()
+    fig.savefig('inference_inf', dpi=1000, bbox_inches='tight')
 
 def main():
     posterior_predictive, dates, y_train = perform_inference('US')
