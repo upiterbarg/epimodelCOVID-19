@@ -49,7 +49,7 @@ class DE(DifferentialEquation):
 def perform_inference(country):
     dd, labels, labels_global = unpack_data()
     dates, x, infected, susceptible = clean_by_country(country, dd, labels, case_thresh=10)
-    
+
     # For now, we use all but the last 'testdim' days as training data, and 
     # the remaining days as testing data.
     testdim = 2
@@ -112,8 +112,8 @@ def plot(posterior_predictive, dates, y_train):
     plt.plot(dates, y0_mean, 'g', label='predicted susceptible')
     plt.plot(dates, y1_mean, 'b', label='predicted infected')
 
-    plt.scatter(dates, y_train[:][0], ':g', label='true susceptible')
-    plt.scatter(dates, y_train[:][1], ':b', label='predicted infected')
+    plt.plot(dates, y_train[:][0], ':g', label='true susceptible')
+    plt.plot(dates, y_train[:][1], ':b', label='predicted infected')
 
     ax.set_xlabel('num days since first case')
     ax.set_ylabel('fraction of population')
