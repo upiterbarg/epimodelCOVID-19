@@ -9,6 +9,7 @@ import arviz as az
 import pdb
 from data import *
 import theano
+import pickle
 
 floatX = theano.config.floatX
 seed(0)
@@ -90,8 +91,15 @@ def perform_inference(country):
 
         print('Starting sampling')
 
-        trace = pm.sample(2000, tune=1000, cores=12, progressbar=True)
+        trace = pm.sample(1000, tune=500, cores=12, progressbar=True)
+
+        # We use a posterior predictive check to validate our model
+        # read more here: https://docs.pymc.io/notebooks/posterior_predictive.html
         posterior_predictive = pm.sample_posterior_predictive(trace, progressbar=True)
+
+    # Save trace
+    with open('my_model.pkl', 'wb') as buff:
+        pickle.dump({'model': model, 'trace': trace}, buff)
 
     pdb.set_trace()
 
