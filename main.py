@@ -95,7 +95,7 @@ def perform_inference(country):
 
         pdb.set_trace()
 
-    return posterior_predictive, dates[:-testdim], y_train
+    return posterior_predictive, x[:-testdim], y_train
 
 def plot(posterior_predictive, dates, y_train):
     a = posterior_predictive['Y']
@@ -110,15 +110,20 @@ def plot(posterior_predictive, dates, y_train):
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    plt.plot(dates, y0_mean, 'g', label='susceptible')
-    plt.plot(dates, y1_mean, 'b', label='infected')
-    plt.xlabel('Dates')
-    plt.ylabel()
+    plt.plot(dates, y0_mean, 'g', label='predicted susceptible')
+    plt.plot(dates, y1_mean, 'b', label='predicted infected')
+
+    plt.scatter(dates, y_train[:][0], ':g', label='true susceptible')
+    plt.scatter(dates, y_train[:][1], ':b', label='predicted infected')
+
+    ax.set_xlabel('num days since first case')
+    ax.set_ylabel('fraction of population')
     ax.legend()
+    fig.savefig('inference', dpi=1000, bbox_inches='tight')
 
 def main():
-    posterior_predictive, dates = perform_inference('US')
-    plot(posterior_predictive, dates)
+    posterior_predictive, dates, y_train = perform_inference('US')
+    plot(posterior_predictive, dates, y_train)
     pdb.set_trace()
 
 
