@@ -90,10 +90,12 @@ def perform_inference(country):
 
         print('Starting sampling')
 
-        trace = pm.sample(2000, tune=1000, cores=2, progressbar=True)
+        trace = pm.sample(2000, tune=1000, cores=12, progressbar=True)
         posterior_predictive = pm.sample_posterior_predictive(trace, progressbar=True)
 
-        pdb.set_trace()
+    pdb.set_trace()
+
+    print(pm.summary(trace))
 
     return posterior_predictive, x[:-testdim], y_train
 
@@ -104,9 +106,6 @@ def plot(posterior_predictive, dates, y_train):
 
     y0_mean = np.mean(y0, axis=0)
     y1_mean = np.mean(y1, axis=0)
-
-    fig.savefig('pred_sus', dpi=1000, bbox_inches='tight')
-    fig.savefig('pred_inf', dpi=1000, bbox_inches='tight')
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
