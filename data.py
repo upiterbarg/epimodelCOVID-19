@@ -132,7 +132,7 @@ def clean_by_country(country, dd, labels, case_thresh=1):
     infected = (conf - deaths - recov)/pop
     susceptible = (pop - conf)/pop
 
-    return dates, np.arange(1, deaths.shape[0]+1), infected/pop, susceptible/pop
+    return dates, np.arange(1, deaths.shape[0]+1).astype(float), infected, susceptible
 
 def clean_by_state(state, dd, labels, case_thresh=10):
     pass

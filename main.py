@@ -7,138 +7,89 @@ from scipy.integrate import odeint, solve_ivp
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import arviz as az 
 import pdb
-from data import *
 import theano
 import pickle
+import os.path as osp
+
+from data import *
+from plot import *
 
 floatX = theano.config.floatX
-seed(0)
-#plt.style.use('seaborn-darkgrid')
-#rc('font',**{'family':'serif','serif':['Palatino']})
-#rc('text', usetex=True)
 
-# SIR Model
-def SIR(y, t, p):
-    ds = -p[0]*y[0]*y[1] # Susceptible differential
-    di = p[0]*y[0]*y[1] - p[1]*y[1] # Infected differential
-    return [ds, di]
+def get_SIR(x, y, y0, country, forecast_len=0, load=False):
+    # SIR Model
+    def SIR(y, t, p):
+        ds = -p[0]*y[0]*y[1] # Susceptible differential
+        di = p[0]*y[0]*y[1] - p[1]*y[1] # Infected differential
+        return [ds, di]
 
-class DE(DifferentialEquation):
-    def _simulate(self, y0, theta):
-        # Begin with initial conditions and raveled sensitivity matrix
-        s0 = np.concatenate([y0, self._sens_ic])
-        
-        # Integrate
-        sol = solve_ivp(
-            fun = lambda t, Y: self._system(Y, t, tuple(np.concatenate([y0, theta]))),
-            t_span=[self._augmented_times.min(), self._augmented_times.max()],
-            y0=s0,
-            method='RK23',
-            t_eval=self._augmented_times[1:],
-            atol=1, rtol=1,
-            max_step=0.02).y.T.astype(floatX)
-        
-        # Extract the solution
-        y = sol[:, :self.n_states]
+    # Initialize ODE
+    sir_ode = DifferentialEquation(
+        func=SIR,
+        times=x,
+        n_states=2, 
+        n_theta=2, 
+        t0=0
+    )
 
-        # Reshape sensativities
-        sens = sol[0:, self.n_states:].reshape(self.n_times, self.n_states, self.n_p)
+    load_dir = osp.join('traces', country.lower().replace(' ','_'))
 
-        return y, sens
+    with pm.Model() as model:
+        sigma = pm.HalfNormal('sigma', 3, shape=2)
 
+        # R0 is bounded below by 1 because we see an epidemic has occured
+        R0 = pm.Bound(pm.Normal, lower=1)('R0', 2, 3)
 
-def perform_inference(country):
+        lmbda = pm.Normal('lambda', 0.11, 0.1)
+
+        beta = pm.Deterministic('beta', lmbda * R0)
+
+        print('Setting up model')
+        sir_curves = sir_ode(y0=y0, theta=[beta, lmbda])
+
+        y_obs = pm.Normal('y_obs', mu=sir_curves, sigma=sigma, observed=y)
+
+        if not load: 
+            trace = pm.sample(3000, tune=1500, cores=12, chains=12, target_accept=0.9, progressbar=True)
+
+            # Save trace
+            pm.save_trace(trace, load_dir, overwrite=True)
+        else:
+            # Load trace
+            trace = pm.load_trace(load_dir)
+
+        pdb.set_trace()
+        posterior_predictive = pm.sample_posterior_predictive(trace, progressbar=True)
+
+    return trace, posterior_predictive
+
+def perform_inference(country, case_thresh, forecast_len=0, load=False):
     dd, labels, labels_global = unpack_data()
-    dates, x, infected, susceptible = clean_by_country(country, dd, labels, case_thresh=10)
-
+    dates, x, infected, susceptible = clean_by_country(country, dd, labels, case_thresh=case_thresh)
+    
     # For now, we use all but the last 'testdim' days as training data, and 
     # the remaining days as testing data.
-    testdim = 2
+    testdim = 1
     
-    train = x[:-testdim]
-    test = x[-testdim:]
+    x_train = x[:-testdim]
+    x_test = x[-testdim:]
 
-    x_scale =  MinMaxScaler().fit_transform(train.reshape(-1,1)).flatten()
+    x_train_scale = MinMaxScaler().fit_transform(x_train.reshape(-1,1)).flatten()
 
     y_train = np.hstack((susceptible[:-testdim].reshape(-1,1), infected[:-testdim].reshape(-1,1)))
     y_test = np.hstack((susceptible[-testdim:].reshape(-1,1), infected[-testdim:].reshape(-1,1)))
 
     y0 = [y_train[0][0], y_train[0][1]]
 
-    sir_model = DE(
-        func=SIR,
-        times=train,
-        n_states=2,
-        n_theta=2, 
-        t0=0
-    )
-
-    with pm.Model() as model:
-        print('Initializing Priors')
-        sigma = pm.HalfNormal('sigma', 1, shape=2)
-
-        # R0 is bounded below by 1 because we see an epidemic has occured
-        R0 = pm.Bound(pm.Normal, lower=1)('R0', 2, 3)
-        lmbda = pm.Normal('lambda', 0, 10)
-        delta = pm.Normal('delta', 0, 10)
-        beta = pm.Deterministic('beta', lmbda*R0)
-        
-        
-        print('Setting up model')
-        sir_curves = sir_model(y0=y0, theta=[beta, lmbda])
-
-        Y = pm.Normal('Y', mu=sir_curves, sigma=sigma, observed=y_train)
-
-        print('Starting sampling')
-
-        trace = pm.sample(1000, tune=500, cores=12, progressbar=True)
-
-        # We use a posterior predictive check to validate our model
-        # read more here: https://docs.pymc.io/notebooks/posterior_predictive.html
-        posterior_predictive = pm.sample_posterior_predictive(trace, progressbar=True)
-
-    # Save trace
-    with open('my_model.pkl', 'wb') as buff:
-        pickle.dump({'model': model, 'trace': trace}, buff)
-
-    pdb.set_trace()
+    trace, posterior_predictive = get_SIR(x_train_scale, y_train, y0, country, forecast_len=forecast_len, load=load)
 
     print(pm.summary(trace))
 
-    return posterior_predictive, x[:-testdim], y_train
-
-def plot(posterior_predictive, dates, y_train):
-    a = posterior_predictive['Y']
-    y0 = a[:,:,0]
-    y1 = a[:,:,1]
-
-    y0_mean = np.mean(y0, axis=0)
-    y1_mean = np.mean(y1, axis=0)
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    plt.plot(dates, y0_mean, ':g', label='predicted susceptible')
-    plt.plot(dates, y_train[:, 0], 'g', label='true susceptible')
-
-    ax.set_xlabel('num days since first case')
-    ax.set_ylabel('fraction of population')
-    ax.legend()
-    fig.savefig('inference_sus', dpi=1000, bbox_inches='tight')
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    plt.plot(dates, y1_mean, ':b', label='predicted infected')
-    plt.plot(dates, y_train[:, 1], 'b', label='true infected')
-
-    ax.set_xlabel('num days since first case')
-    ax.set_ylabel('fraction of population')
-    ax.legend()
-    fig.savefig('inference_inf', dpi=1000, bbox_inches='tight')
+    return posterior_predictive, x_train, y_train
 
 def main():
-    posterior_predictive, dates, y_train = perform_inference('US')
-    plot(posterior_predictive, dates, y_train)
-    pdb.set_trace()
+    posterior_predictive, dates, y_train = perform_inference('China', 100, load=False)
+    plot_post(posterior_predictive, dates, y_train)
 
 
 if __name__ == '__main__':
