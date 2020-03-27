@@ -88,7 +88,7 @@ def plot_SIR_curve(post, y_train, x_out, dates, country):
     plt.plot(pred_enum, recov_mean, ':r', alpha=0.6)
     
     plt.xlabel(r'Days')
-    plt.xlabel(r'Proportion of total population')
+    plt.ylabel(r'Proportion of total population')
     plt.ylim([0, 1.01])
     plt.xlim([pred_enum[0], pred_enum[-1]])
     plt.title(r'SIR Infection Rates in '+country)

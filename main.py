@@ -27,7 +27,7 @@ def get_SIR(x, y, y0, country, forecast_len=0):
     # If in 'prediction mode', modify x, y to reflect forecast length
     if forecast_len != 0:
         ext = np.arange(1, forecast_len+1).astype(float)
-        ext *= x[1]+x[-1]
+        ext += x[-1]
         x = np.append(x, ext)
         y = np.empty((x.shape[0], y.shape[1]))
 
@@ -87,12 +87,15 @@ def perform_inference(country, forecast_len=0):
     # If in training mode, examine data only after 100 cases have 
     # been recorded in country (for better chances at convergence).
     # Otherwise, start at the first case
+    '''
     if forecast_len != 0:
         case_thresh = 100 
     else:
         case_thresh = 1
-
-    dd, labels, labels_global = unpack_data()
+    '''
+    #case_thresh = 100
+    case_thresh = 10
+    dd, labels = unpack_data()
     dates, x, infected, susceptible = clean_by_country(country, dd, labels, case_thresh=case_thresh)
     
     # For now, we use all but the last 'testdim' days as training data, and 
@@ -109,15 +112,18 @@ def perform_inference(country, forecast_len=0):
 
     y0 = [y_train[0][0], y_train[0][1]]
 
+
     trace, post, x_out = get_SIR(x_train, y_train, y0, country, forecast_len=forecast_len)
 
-    print(pm.summary(trace))
-
+    pdb.set_trace()
+    with open(country+'_post.pkl', 'wb') as buff:              
+        pickle.dump({'post': post}, buff)
+    
     return post, y_train, x_out, dates
 
 def main():
-    country = 'China'
-    post, y_train, x_out, dates = perform_inference(country, forecast_len=300)
+    country = 'US'
+    post, y_train, x_out, dates = perform_inference(country, forecast_len=0)
     #plot_post(post, dates, y_train)
     plot_SIR_curve(post, y_train, x_out, dates, country)
 

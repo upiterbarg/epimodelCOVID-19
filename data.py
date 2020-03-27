@@ -16,11 +16,12 @@ def unpack_data():
 
     # Unpack latest timeseries data
     ts_path = osp.join(os.getcwd(), 'COVID-19', 'csse_covid_19_data', 'csse_covid_19_time_series')
-    conf_path = osp.join(ts_path, 'time_series_19-covid-Confirmed.csv')
-    deaths_path = osp.join(ts_path, 'time_series_19-covid-Deaths.csv')
-    recov_path = osp.join(ts_path, 'time_series_19-covid-Recovered.csv')
-    confglob_path = osp.join(ts_path, 'time_series_covid19_confirmed_global.csv')
-    deathsglob_path = osp.join(ts_path, 'time_series_covid19_deaths_global.csv')
+    conf_path = osp.join(ts_path, 'time_series_covid19_confirmed_global.csv')
+    deaths_path = osp.join(ts_path, 'time_series_covid19_deaths_global.csv')
+    recov_path = osp.join(ts_path, 'time_series_covid19_recovered_global.csv')
+    #confglob_path = osp.join(ts_path, 'time_series_covid19_confirmed_global.csv')
+    #deathsglob_path = osp.join(ts_path, 'time_series_covid19_deaths_global.csv')
+
 
     # Load deaths data
     deaths, labels, dlocs = [], [], []
@@ -55,6 +56,7 @@ def unpack_data():
                 recov.append([float(r) for r in row[4:-1]])
     recov, rlocs = np.array(recov), np.array(rlocs)
 
+    '''
     # Load global confirmed cases data 
     confglob, cgloc, labels_global = [], [], None
     with open(confglob_path, 'r') as csvfile:
@@ -83,10 +85,10 @@ def unpack_data():
     mask = np.array(mask1+mask2, dtype=int).sum(axis=1) != 2
     confglob, cgloc = confglob[mask], cgloc[mask]
     deathsglob, dgloc = deathsglob[mask], dgloc[mask]
+    '''
 
-    dd = {'deaths': deaths, 'conf': conf, 'recov': recov, 'confglob': confglob, 'deathsglob': deathsglob,
-        'dlocs': dlocs, 'clocs': clocs, 'rlocs': rlocs, 'cgloc': cgloc, 'dgloc': dgloc}
-    return dd, labels, labels_global
+    dd = {'deaths': deaths, 'conf': conf, 'recov': recov, 'dlocs': dlocs, 'clocs': clocs, 'rlocs': rlocs}
+    return dd, labels
 
 def clean_by_country(country, dd, labels, case_thresh=1):
     '''
