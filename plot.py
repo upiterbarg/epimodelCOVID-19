@@ -2,8 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rc
 import arviz as az 
+import pdb
 
-plt.style.use('seaborn-darkgrid')
+#plt.style.use('seaborn-darkgrid')
 rc('font',**{'family':'serif','serif':['Palatino']})
 rc('text', usetex=True)
 
@@ -19,6 +20,8 @@ def plot_post(a, dates, y_train, country):
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
+
+    dates = np.arange(1, y0_mean.shape[0]+1)
     plt.plot(dates, y0_mean, ':g', label='predicted susceptible')
     plt.plot(dates, y_train[:, 0], 'g', label='true susceptible')
 
@@ -65,6 +68,8 @@ def plot_SIR_curve(post, y_train, x_out, dates, country):
     total_std = np.std(total, axis=0)
     grad_std = np.std(grad, axis=0)
 
+    #pdb.set_trace()
+
     # Enumerate prediction dates
     pred_enum = np.arange(1, x_out.shape[0]+1)
     dates_enum = np.arange(1, sus_train.shape[0]+1)
@@ -74,25 +79,28 @@ def plot_SIR_curve(post, y_train, x_out, dates, country):
 
     # Plot susceptible
     plt.fill_between(pred_enum, sus_mean+sus_std, sus_mean-sus_std, alpha=0.5, color='g')
-    plt.plot(dates_enum, sus_train, 'g', label=r'susceptible')
+    plt.plot(dates_enum, sus_train, 'g', alpha=0.6, label=r'susceptible')
     plt.plot(pred_enum, sus_mean, ':g', alpha=0.6)
+    plt.scatter(dates_enum[-1], sus_train[-1], color='g', alpha=0.6)
 
     # Plot infected
     plt.fill_between(pred_enum, inf_mean+inf_std, inf_mean-inf_std, alpha=0.5, color='b')
-    plt.plot(dates_enum, inf_train, 'b', label=r'infected')
+    plt.plot(dates_enum, inf_train, 'b', alpha=0.6, label=r'infected')
     plt.plot(pred_enum, inf_mean, ':b', alpha=0.6)
+    plt.scatter(dates_enum[-1], inf_train[-1], color='b', alpha=0.6)
 
     # Plot recovered
     plt.fill_between(pred_enum, recov_mean+recov_std, recov_mean-recov_std, alpha=0.5, color='r')
-    plt.plot(dates_enum, recov_train, 'r', label=r'recovered')
+    plt.plot(dates_enum, recov_train, 'r', alpha=0.6, label=r'recovered')
     plt.plot(pred_enum, recov_mean, ':r', alpha=0.6)
+    plt.scatter(dates_enum[-1], recov_train[-1], color='r', alpha=0.6)
     
-    plt.xlabel(r'Days')
+    plt.xlabel(r'Days since hundredth case is reported')
     plt.ylabel(r'Proportion of total population')
     plt.ylim([0, 1.01])
     plt.xlim([pred_enum[0], pred_enum[-1]])
-    plt.title(r'SIR Infection Rates in '+country)
-    plt.legend()
+    plt.title(r'Inferred SIR Model for COVID-19 Epidemic in '+country)
+    ax.legend(bbox_to_anchor=(1.2, 1.1))
 
     fig.savefig(country+'_sir_plot', dpi=1000, bbox_inches='tight')
 
