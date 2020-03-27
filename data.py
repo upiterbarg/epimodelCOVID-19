@@ -4,6 +4,7 @@ import os
 import os.path as osp
 import pdb
 import csv
+import scipy.stats as stats
 
 
 def unpack_data():
@@ -19,9 +20,6 @@ def unpack_data():
     conf_path = osp.join(ts_path, 'time_series_covid19_confirmed_global.csv')
     deaths_path = osp.join(ts_path, 'time_series_covid19_deaths_global.csv')
     recov_path = osp.join(ts_path, 'time_series_covid19_recovered_global.csv')
-    #confglob_path = osp.join(ts_path, 'time_series_covid19_confirmed_global.csv')
-    #deathsglob_path = osp.join(ts_path, 'time_series_covid19_deaths_global.csv')
-
 
     # Load deaths data
     deaths, labels, dlocs = [], [], []
@@ -56,44 +54,15 @@ def unpack_data():
                 recov.append([float(r) for r in row[4:-1]])
     recov, rlocs = np.array(recov), np.array(rlocs)
 
-    '''
-    # Load global confirmed cases data 
-    confglob, cgloc, labels_global = [], [], None
-    with open(confglob_path, 'r') as csvfile:
-        reader = csv.reader(csvfile, delimiter=',')
-        for row in reader:
-            if labels_global is None: labels_global = row
-            else:
-                cgloc.append(row[:4])
-                confglob.append([float(r) for r in row[4:]])
-    labels_global, confglob, cgloc = np.array(labels_global), np.array(confglob), np.array(cgloc)
-
-    # Load global deaths cases data 
-    deathsglob, dgloc, f = [], [], False
-    with open(deathsglob_path, 'r') as csvfile:
-        reader = csv.reader(csvfile, delimiter=',')
-        for row in reader:
-            if not f: f=True
-            else:
-                dgloc.append(row[:4])
-                deathsglob.append([float(r) for r in row[4:]])
-    deathsglob, dgloc = np.array(deathsglob), np.array(dgloc)
-
-    # Drop diamond 'princess, canada' and 'recovered, canada' from global data 
-    mask1 = cgloc[:, :2] == ['Diamond Princess','Canada']
-    mask2 = cgloc[:, :2] == ['Recovered','Canada']
-    mask = np.array(mask1+mask2, dtype=int).sum(axis=1) != 2
-    confglob, cgloc = confglob[mask], cgloc[mask]
-    deathsglob, dgloc = deathsglob[mask], dgloc[mask]
-    '''
-
     dd = {'deaths': deaths, 'conf': conf, 'recov': recov, 'dlocs': dlocs, 'clocs': clocs, 'rlocs': rlocs}
     return dd, labels
 
-def clean_by_country(country, dd, labels, case_thresh=1):
+def clean_by_country(country, dd, labels, case_thresh=1, SIR=True):
     '''
     Extract country-specific according to the specified case threshold ('case_thresh'),
     returning all relevant values (and corresponding dates) normalized by country population.
+
+    If SIR is False, estimates
 
     Returns:
         dates -- (type: str np.array) all relevant dates
@@ -116,12 +85,29 @@ def clean_by_country(country, dd, labels, case_thresh=1):
     min_ind = np.min(np.arange(0, conf.shape[0])[mask])
     deaths, conf, recov, dates = deaths[min_ind:], conf[min_ind:], recov[min_ind:], labels[4+min_ind:]
 
-    # Convert data (deaths, conf, recov) from corresponding to per day reports to instead
-    # represent cumulative numbers
-    for i in range(1, dates.shape[0]):
-        deaths[i] += deaths[i-1]
-        conf[i] += conf[i-1]
-        recov[i] += recov[i-1]
+
+    # Estimate 'exposed' for SEIR based on publiched covid19 incubation data
+    # (fairly lognormal with mean=5.5 and std=4.75)
+    exposed = None
+    if not SIR:
+        newcases = [conf[0]]
+        for i in range(1, conf.shape[0]):
+            newcases.append(conf[i]-conf[i-1])
+        newcases = np.array(newcases)
+
+        total_cases = int(conf[-1])
+        rincub_times = np.round(stats.lognorm.rvs(4.75, loc=5.5, size=total_cases)).astype(int)
+        exposed = np.zeros(conf.shape[0])
+        for i in range(total_cases):
+            mask = newcases > 0
+            if not True in mask: pdb.set_trace()
+            min_ind = np.min(np.arange(0, newcases.shape[0])[mask])
+            if min_ind - rincub_times[i] >= 0:
+                exposed[min_ind - rincub_times[i]] += 1
+            newcases[min_ind] -= 1
+
+        # Apply second case threshold if SIR is True
+        deaths, conf, recov, exposed, dates = deaths[:-14], conf[:-14], recov[:-14], exposed[:-14], dates[:-14]
 
     # Extract total population from World Bank Data csv (note: based on 2018!!)
     df_pop = pd.read_csv("population_worldbank2018.csv")
@@ -129,12 +115,19 @@ def clean_by_country(country, dd, labels, case_thresh=1):
     if pop.shape[0] == 0:
         raise ValueError('Failed to find country population in World Bank dataset.')
     pop = pop.values[0]
+
     
     # Compute fraction of infected and susceptible individuals in country by day
-    infected = (conf - deaths - recov)/pop
-    susceptible = (pop - conf)/pop
+    if exposed is None:
+        infected = (conf - deaths - recov)/pop
+        susceptible = (pop - conf)/pop
+    else:
+        infected = (conf + exposed - deaths - recov)/pop
+        susceptible = (pop - conf - exposed)/pop
+        exposed = exposed/pop
 
-    return dates, np.arange(1, deaths.shape[0]+1).astype(float), infected, susceptible
+
+    return dates, np.arange(1, deaths.shape[0]+1).astype(float), infected, susceptible, exposed
 
 def clean_by_state(state, dd, labels, case_thresh=10):
     pass
