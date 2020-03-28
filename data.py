@@ -122,7 +122,7 @@ def clean_by_country(country, dd, labels, case_thresh=1, SIR=True):
         infected = (conf - deaths - recov)/pop
         susceptible = (pop - conf)/pop
     else:
-        infected = (conf + exposed - deaths - recov)/pop
+        infected = (conf - deaths - recov)/pop
         susceptible = (pop - conf - exposed)/pop
         exposed = exposed/pop
 

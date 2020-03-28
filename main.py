@@ -25,7 +25,7 @@ def get_SIR(x, y, y0, country, forecast_len=0, load_post=False):
     '''
 
     # If in 'prediction mode', modify x, y to reflect forecast length
-    
+    pdb.set_trace()
     if forecast_len != 0:
         ext = np.arange(1, forecast_len+1).astype(float)
         ext += x[-1]
@@ -92,7 +92,7 @@ def get_SIR(x, y, y0, country, forecast_len=0, load_post=False):
    
     return trace, out_post, x
 
-def get_SEIR(x, y, y0, country, forecast_len=0, load_post=False, rho=1.0, alpha=0.21):
+def get_SEIR(x, y, y0, country, forecast_len=0, load_post=False, rho=.8, alpha=0.21):
     '''
 
     We account for social distancing by adding the parameter 'rho' to the classical
@@ -107,12 +107,18 @@ def get_SEIR(x, y, y0, country, forecast_len=0, load_post=False, rho=1.0, alpha=
 
     # If in 'prediction mode', modify x, y to reflect forecast length
     
+    if forecast_len != 0:
+        ext = np.arange(1, forecast_len+1).astype(float)
+        ext += x[-1]
+        x = np.append(x, ext)
+        y = np.empty((x.shape[0], y.shape[1]))
+   
     # SEIR Model w/ Social Distancing
     # p[0]: beta, p[1]: lambda, p[2]: incubation time
     def SEIR(y, t, p):
         ds = -p[0]*rho*y[0]*y[1] # Susceptible differential
-        di = p[0]*rho*y[0]*y[1] - (1/p[2])*y[2] # Infected differential
-        de = (1/p[2])*y[2] - p[1]*y[1] # Exposed differential
+        de = p[0]*rho*y[0]*y[1] - (1/p[2])*y[2] # Exposed differential
+        di = (1/p[2])*y[2] - p[1]*y[1] # Infected differential
         return [ds, di, de]
 
     # Initialize ODE
@@ -149,11 +155,14 @@ def get_SEIR(x, y, y0, country, forecast_len=0, load_post=False, rho=1.0, alpha=
 
             # Save trace
             pm.save_trace(trace, load_dir, overwrite=True)
-
-            pdb.set_trace()
             
             # Get the posterior
-            post= pm.sample_posterior_predictive(trace, progressbar=True)
+            post = pm.sample_posterior_predictive(trace, progressbar=True)
+
+            if not load_post:
+                with open(country+'_seir_post.pkl', 'wb') as buff:              
+                    pickle.dump({'post': post['y_obs']}, buff)
+            
         else:
             # Load trace
             print('Loading trace')
@@ -163,6 +172,10 @@ def get_SEIR(x, y, y0, country, forecast_len=0, load_post=False, rho=1.0, alpha=
             #Get posterior
             if not load_post:
                 post = pm.sample_posterior_predictive(trace[500:], progressbar=True)
+                if not load_post:
+                    with open(country+'_seir_post.pkl', 'wb') as buff:              
+                        pickle.dump({'post': post['y_o']}, buff)
+    
                 out_post = post['y_obs']
             else:
                 with open(country+'_post.pkl', 'rb') as buff:
@@ -201,9 +214,6 @@ def perform_inference(country, forecast_len=0, load_post=False, SIR=True, alpha=
 
         y0 = [y_train[0][0], y_train[0][1], y_train[0][2]]
         trace, post, x_out = get_SEIR(x_train, y_train, y0, country, forecast_len=forecast_len, load_post=load_post)
-    if not load_post:
-        with open(country+'_post.pkl', 'wb') as buff:              
-            pickle.dump({'post': post}, buff)
     
     return post, y_train, x_out, dates
 
@@ -211,7 +221,7 @@ def main():
     country = 'China'
     post, y_train, x_out, dates = perform_inference(country, forecast_len=0, load_post=False, SIR=False)
     #plot_post(post, dates, y_train, country)
-    plot_SIR_curve(post, y_train, x_out, dates, country)
+    plot_SIR_curve(post, y_train, x_out, dates, country, SIR=True)
 
 
 if __name__ == '__main__':
