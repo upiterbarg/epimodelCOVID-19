@@ -57,12 +57,10 @@ def unpack_data():
     dd = {'deaths': deaths, 'conf': conf, 'recov': recov, 'dlocs': dlocs, 'clocs': clocs, 'rlocs': rlocs}
     return dd, labels
 
-def clean_by_country(country, dd, labels, case_thresh=1, SIR=True):
+def clean_by_country(country, dd, labels, case_thresh=1):
     '''
     Extract country-specific according to the specified case threshold ('case_thresh'),
     returning all relevant values (and corresponding dates) normalized by country population.
-
-    If SIR is False, estimates
 
     Returns:
         dates -- (type: str np.array) all relevant dates
@@ -80,34 +78,13 @@ def clean_by_country(country, dd, labels, case_thresh=1, SIR=True):
     if deaths.shape[0] == 0 or conf.shape[0] == 0 or recov.shape[0] == 0:
         raise ValueError('Failed to find country in data! Check your spelling.')
 
-    # Apply case threshold
     mask = conf >= case_thresh
     min_ind = np.min(np.arange(0, conf.shape[0])[mask])
     deaths, conf, recov, dates = deaths[min_ind:], conf[min_ind:], recov[min_ind:], labels[4+min_ind:]
 
-
     # Estimate 'exposed' for SEIR based on publiched covid19 incubation data
     # (fairly lognormal with mean=5.5 and std=4.75)
     exposed = None
-    if not SIR:
-        newcases = [conf[0]]
-        for i in range(1, conf.shape[0]):
-            newcases.append(conf[i]-conf[i-1])
-        newcases = np.array(newcases)
-
-        total_cases = int(conf[-1])
-        rincub_times = np.round(stats.lognorm.rvs(4.75, loc=5.5, size=total_cases)).astype(int)
-        exposed = np.zeros(conf.shape[0])
-        for i in range(total_cases):
-            mask = newcases > 0
-            if not True in mask: pdb.set_trace()
-            min_ind = np.min(np.arange(0, newcases.shape[0])[mask])
-            if min_ind - rincub_times[i] >= 0:
-                exposed[min_ind - rincub_times[i]] += 1
-            newcases[min_ind] -= 1
-
-        # Apply second case threshold if SIR is True
-        deaths, conf, recov, exposed, dates = deaths[:-14], conf[:-14], recov[:-14], exposed[:-14], dates[:-14]
 
     # Extract total population from World Bank Data csv (note: based on 2018!!)
     df_pop = pd.read_csv("population_worldbank2018.csv")
@@ -126,11 +103,4 @@ def clean_by_country(country, dd, labels, case_thresh=1, SIR=True):
         susceptible = (pop - conf - exposed)/pop
         exposed = exposed/pop
 
-
     return dates, np.arange(1, deaths.shape[0]+1).astype(float), infected, susceptible, exposed
-
-def clean_by_state(state, dd, labels, case_thresh=10):
-    pass
-
-
-
