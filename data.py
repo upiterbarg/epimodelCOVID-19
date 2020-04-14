@@ -82,13 +82,11 @@ def clean_by_country(country, dd, labels, case_thresh=1):
     min_ind = np.min(np.arange(0, conf.shape[0])[mask])
     deaths, conf, recov, dates = deaths[min_ind:], conf[min_ind:], recov[min_ind:], labels[4+min_ind:]
 
-    # Estimate 'exposed' for SEIR based on publiched covid19 incubation data
-    # (fairly lognormal with mean=5.5 and std=4.75)
     exposed = None
 
-    # Extract total population from World Bank Data csv (note: based on 2018!!)
-    df_pop = pd.read_csv("population_worldbank2018.csv")
-    pop = df_pop['Population'][df_pop['Country'] == country]
+    # Extract total population from UN Data csv (forecasts for 2020!!)
+    df_pop = pd.read_csv("UN_2020_popforecast.csv")
+    pop = df_pop['Population Forecast'][df_pop['Country'] == country]
     if pop.shape[0] == 0:
         raise ValueError('Failed to find country population in World Bank dataset.')
     pop = pop.values[0]
