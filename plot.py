@@ -7,7 +7,8 @@ import arviz as az
 import pymc3 as pm 
 import pdb
 from scipy.integrate import odeint
-
+import bootstrapped.bootstrap as bs
+import bootstrapped.stats_functions as bs_stats
 
 rc('font',**{'family':'serif','serif':['Palatino']})
 rc('text', usetex=True)
@@ -56,6 +57,20 @@ def plot_post(a, dates, y_train, country):
     fig.suptitle(r'Inferred SIR Curves for COVID-19 Epidemic in '+country + ' vs. Training Data')
     fig.savefig('inference_inf_'+country+'_p2-8-20', dpi=1000, bbox_inches='tight')
 
+
+def perform_bootstrap(ds, nsamples=1e5):
+    dim = ds.shape[1]
+    low_bounds = []
+    high_bounds = []
+    for i in range(dim):
+        cfd = bs.bootstrap(ds[:, i], stat_func=bs_stats.mean, alpha=0.05, num_iterations=nsamples)
+        low_bounds.append(cfd[0])
+        high_bounds.append(cfd[1])
+    low_bounds = np.array(low_bounds)
+    high_bounds = np.array(high_bounds)
+
+    return low_bounds, high_bounds
+
 def plot_SIR_curve(post, y_train, x_out, dates, country):
     sus, inf = post[:,:,0], post[:,:,1] # susceptible, infected
     recov = 1 - post[:,:,0] - post[:,:,1] # recovered
@@ -69,10 +84,16 @@ def plot_SIR_curve(post, y_train, x_out, dates, country):
     sus_mean = np.mean(sus, axis=0)
     inf_mean = np.mean(inf, axis=0)
     recov_mean = np.mean(recov, axis=0)
+
     # Compute standard deviations
     sus_std = np.std(sus, axis=0)*2
     inf_std = np.std(inf, axis=0)*2
     recov_std = np.std(recov, axis=0)*2
+
+    # Get bootstrap 95% confidence interval bounds for means
+    sus_lb, sus_hb = perform_bootstrap(sus)
+    inf_lb, inf_hb = perform_bootstrap(inf)
+    recov_lb, recov_hb = perform_bootstrap(recov)
 
 
     # Enumerate prediction dates
@@ -83,19 +104,19 @@ def plot_SIR_curve(post, y_train, x_out, dates, country):
     ax = fig.add_subplot(111)
 
     # Plot susceptible
-    plt.fill_between(pred_enum, sus_mean+sus_std, sus_mean-sus_std, alpha=0.5, color='g')
+    plt.fill_between(pred_enum, sus_lb, sus_hb, alpha=0.5, color='g')
     plt.plot(dates_enum, sus_train, 'g', alpha=0.6, label=r'susceptible')
     plt.plot(pred_enum, sus_mean, ':g', alpha=0.6)
     plt.scatter(dates_enum[-1], sus_train[-1], color='g', alpha=0.6)
 
     # Plot infected
-    plt.fill_between(pred_enum, inf_mean+inf_std, inf_mean-inf_std, alpha=0.5, color='b')
+    plt.fill_between(pred_enum, inf_lb, inf_hb, alpha=0.5, color='b')
     plt.plot(dates_enum, inf_train, 'b', alpha=0.6, label=r'infected')
     plt.plot(pred_enum, inf_mean, ':b', alpha=0.6)
     plt.scatter(dates_enum[-1], inf_train[-1], color='b', alpha=0.6)
 
     # Plot recovered
-    plt.fill_between(pred_enum, recov_mean+recov_std, recov_mean-recov_std, alpha=0.5, color='r')
+    plt.fill_between(pred_enum, recov_lb, recov_hb, alpha=0.5, color='r')
     plt.plot(dates_enum, recov_train, 'r', alpha=0.6, label=r'removed')
     plt.plot(pred_enum, recov_mean, ':r', alpha=0.6)
     plt.scatter(dates_enum[-1], recov_train[-1], color='r', alpha=0.6)
