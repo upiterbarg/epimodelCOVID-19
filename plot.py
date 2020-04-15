@@ -30,13 +30,14 @@ def plot_post(a, dates, y_train, country):
     y0_mean = np.mean(y0, axis=0)
     y1_mean = np.mean(y1, axis=0)
 
-    y0_std = np.std(y0, axis=0)*2
-    y1_std = np.std(y1, axis=0)*2
+    # Get bootstrap 95% confidence interval bounds for means
+    y0_lb, y0_hb = perform_bootstrap(y0)
+    y1_lb, y1_hb = perform_bootstrap(y1)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 4.5))
 
     dates = np.arange(0, y0_mean.shape[0])
-    ax1.fill_between(dates, y0_mean-y0_std, y0_mean+y0_std, alpha=0.5, color='g')
+    ax1.fill_between(dates, y0_lb, y0_hb, alpha=0.5, color='g')
     ax1.plot(dates, y0_mean, ':g', label='predicted susceptible')
     ax1.plot(dates, y_train[:, 0], 'g', label='true susceptible')
 
@@ -44,7 +45,7 @@ def plot_post(a, dates, y_train, country):
     ax1.set_ylabel(r'Proportion of total population')
     ax1.legend(loc='lower left')
 
-    ax2.fill_between(dates, y1_mean-y1_std, y1_mean+y1_std, alpha=0.5, color='b')
+    ax2.fill_between(dates, y1_lb, y1_hb, alpha=0.5, color='b')
     ax2.plot(dates, y1_mean, ':b', label='predicted infected')
     ax2.plot(dates, y_train[:, 1], 'b', label='true infected')
 
